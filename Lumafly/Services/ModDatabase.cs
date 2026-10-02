@@ -18,16 +18,32 @@ namespace Lumafly.Services
 {
     public class ModDatabase : IModDatabase
     {
-        public const string LINKS_LATEST_BASE = "https://raw.githubusercontent.com/hk-modding/modlinks/main";
-        // TODO: there is a thing like tags, or branches for when the change happens
-        public const string LINKS_1578_BASE = "https://raw.githubusercontent.com/hk-modding/modlinks/6f68dbcce825b6b0e5464e36fd5ad10fc9ba72fb";
-
-        public const string LINKS_1432_BASE = "https://raw.githubusercontent.com/FrostyTwilight/modlinks-1432/refs/heads/master";
+        // Just for test
+        public const string LINKS_BASE_MAP = "https://raw.githubusercontent.com/FrostyTwilight/Lumafly/static-resources/ModLinks.json";
 
         private const string VanillaApiRepo = "https://raw.githubusercontent.com/TheMulhima/Lumafly/static-resources/AssemblyLinks.json";
 
+
+        private static Dictionary<string, string>? modlinks_base_map = null;
+
+        private static async Task FetchModLinksBaseMap(HttpClient hc, ISettings? settings)
+        {
+            if(modlinks_base_map != null)
+            {
+                return;
+            }
+
+            var json = JsonDocument.Parse(await Fetch(hc, settings, new(LINKS_BASE_MAP)));
+            modlinks_base_map = json.Deserialize<Dictionary<string, string>>();
+
+            Debug.Assert(modlinks_base_map != null);
+            Debug.Assert(modlinks_base_map["default"] != null);
+        }
+
         private static string GetLinksBase(ISettings settings, ICheckValidityOfAssembly checkValidityOfAssembly)
         {
+            Debug.Assert(modlinks_base_map != null);
+
             if (settings.GameVersion == null)
             {
                 checkValidityOfAssembly.GetAPIVersion(Installer.Current, out var gameVersionString);
@@ -40,29 +56,21 @@ namespace Lumafly.Services
                 settings.GameVersion = gameVersion;
             }
 
-            string linksBase;
             settings.IsOldMode = false;
-            if (settings.GameVersion >= new Version("1.5.12620"))
+
+            var verString = settings.GameVersion.ToString();
+
+            if (!modlinks_base_map.TryGetValue(verString, out var linksBase))
             {
-                // New modding api (latest)
-                linksBase = LINKS_LATEST_BASE;
+                linksBase = modlinks_base_map["default"];
             }
-            else if (settings.GameVersion == new Version("1.5.78.11833"))
-            {
-                // Old modding api 
-                // See https://discord.com/channels/879125729936298015/913460282750291968/1533483165845557349
-                linksBase = LINKS_1578_BASE;
-            }
-            else if(settings.GameVersion == new Version("1.4.3.2"))
+
+           if(settings.GameVersion == new Version("1.4.3.2"))
             {
                 // 1432 modding api
-                linksBase = LINKS_1432_BASE;
                 settings.IsOldMode = true;
             }
-            else
-            {
-                throw new NotSupportedException($"The current version of the game is not supported. ({settings.GameVersion})");
-            }
+
             return linksBase;
         }
 
@@ -183,6 +191,7 @@ namespace Lumafly.Services
 
         private static async Task<ApiLinks> FetchApiLinks(HttpClient hc, ISettings settings, ICheckValidityOfAssembly checkValidityOfAssembly)
         {
+            await FetchModLinksBaseMap(hc, settings);
             return FromString<ApiLinks>(await Fetch(hc, settings, new Uri(GetAPILinksUri(settings, checkValidityOfAssembly))));
         }
         
@@ -223,6 +232,7 @@ namespace Lumafly.Services
                 }
             }
 
+            await FetchModLinksBaseMap(hc, settings);
             return FromString<ModLinks>(await Fetch(hc, settings, new Uri(GetModlinksUri(settings, checkValidityOfAssembly))));
             
         }
