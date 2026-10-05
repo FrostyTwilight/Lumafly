@@ -19,7 +19,7 @@ namespace Lumafly.Services
     public class ModDatabase : IModDatabase
     {
         // Just for test
-        public const string LINKS_BASE_MAP = "https://raw.githubusercontent.com/FrostyTwilight/Lumafly/static-resources/ModLinks.json";
+        public const string LINKS_BASE_MAP = "https://raw.githubusercontent.com/TheMulhima/Lumafly/static-resources/ModLinks.json";
 
         private const string VanillaApiRepo = "https://raw.githubusercontent.com/TheMulhima/Lumafly/static-resources/AssemblyLinks.json";
 
