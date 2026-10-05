@@ -18,7 +18,6 @@ public class CheckValidityOfAssembly : ICheckValidityOfAssembly
         _fs = fs;
         _settings = settings;
     }
-    
     public int? GetAPIVersion(string asmName, out string? gameVersion)
     {
         gameVersion = null;
@@ -27,7 +26,20 @@ public class CheckValidityOfAssembly : ICheckValidityOfAssembly
             string asm = Path.Combine(_settings.ManagedFolder, asmName);
             if (!File.Exists(asm))
                 return null;
-
+            using var stream = File.Open(asm, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return GetAPIVersion(stream, out gameVersion);
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine(ex);
+            return null;
+        }
+    }
+    public int? GetAPIVersion(Stream asm, out string? gameVersion)
+    {
+        gameVersion = null;
+        try
+        {
             using AssemblyDefinition asmDefinition = AssemblyDefinition.ReadAssembly(asm, new()
             {
                 ReadingMode = ReadingMode.Deferred

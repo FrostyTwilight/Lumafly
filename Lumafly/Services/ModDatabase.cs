@@ -90,8 +90,8 @@ namespace Lumafly.Services
 
         public List<ModItem> Items => _items;
 
-        private readonly List<ModItem> _items = new();
-        private readonly List<string> _itemNames = new();
+        private readonly List<ModItem> _items = [];
+        private readonly List<string> _itemNames = [];
 
         private ModDatabase(IModSource mods, 
             IGlobalSettingsFinder _settingsFinder, 
@@ -165,14 +165,15 @@ namespace Lumafly.Services
             ISettings settings, ICheckValidityOfAssembly checkValidityOfAssembly,
             bool fetchOfficial = true)
         {
-            // although slower to fetch one by one, prevents silent errors and hence resulting in 
+
+            // although slower to fetch one by one, prevents silent errors and hence resulting in
             // empty screen with no error
             ModLinks ml = await FetchModLinks(hc, settings, checkValidityOfAssembly, fetchOfficial);
             ApiLinks al = await FetchApiLinks(hc, settings, checkValidityOfAssembly);
 
             return (ml, al);
         }
-        
+
         public static T FromString<T>(string xml) where T : XmlDataContainer
         {
             var serializer = new XmlSerializer(typeof(T));
@@ -259,14 +260,25 @@ namespace Lumafly.Services
             {
                 platform = "Linux";
             }
-            var jsonKey = $"{settings?.GameVersion}-{platform}-Assembly-CSharp.dll.v";
-            
-            json.RootElement.TryGetProperty(jsonKey, out var linkElem);
-            
-            var link = linkElem.GetString();
-            if (link != null)
-                return link;
-            throw new Exception("Lumafly was unable to get vanilla assembly link from its resources. Please verify integrity of game files instead");
+
+            var gameVersion = settings.GameVersion;
+
+            Debug.Assert(gameVersion != null);
+
+            if (json.RootElement.TryGetProperty("by_version", out var byVersion))
+            {
+                foreach (var version in byVersion.EnumerateObject())
+                {
+                    if (GameVersion.Normalize(version.Name) == gameVersion
+                        && version.Value.TryGetProperty(platform, out var linkElem)
+                        && linkElem.GetString() is { } link)
+                        return link;
+                }
+            }
+
+            throw new ReadableError(
+                $"Lumafly has no vanilla assembly for Hollow Knight {gameVersion}. " +
+                "Please verify integrity of game files instead.");
         }
     }
 

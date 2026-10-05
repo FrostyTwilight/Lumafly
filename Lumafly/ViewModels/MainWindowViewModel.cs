@@ -140,6 +140,9 @@ namespace Lumafly.ViewModels
             HttpClient hc = new HttpClient();
             CheckValidityOfAssembly checkValidityOfAssembly = new(fs, settings);
             LumaflyMode lumaflyMode;
+
+            checkValidityOfAssembly.GetAPIVersion(Installer.Current, out var gameVersion);
+            Trace.WriteLine($"Detected game version: {gameVersion ?? "unknown"}");
             
             var modLinksCache = Path.Combine(Settings.ConfigFolderPath, "Modlinks.xml");
             var apiLinksCache = Path.Combine(Settings.ConfigFolderPath, "ApiLinks.xml");

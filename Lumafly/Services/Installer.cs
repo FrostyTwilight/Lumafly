@@ -263,11 +263,19 @@ namespace Lumafly.Services
                     return;
                 
                 string managed = _config.ManagedFolder;
+                _checkValidityOfAssembly.GetAPIVersion(Current, out var gameVersion);
 
                 var url = await ModDatabase.FetchVanillaAssemblyLink(_config);
 
                 (ArraySegment<byte> data, _) = await DownloadFile(url, _ => { });
-                
+
+                _checkValidityOfAssembly.GetAPIVersion(data.AsMemory().AsStream(), out var vanillaGameVersion);
+
+                if (!GameVersion.Equal(vanillaGameVersion, gameVersion))
+                    throw new ReadableError(
+                        $"The downloaded vanilla assembly is for Hollow Knight {vanillaGameVersion ?? "unknown"}, " +
+                        $"but the installed game is {gameVersion ?? "unknown"}. Please verify integrity of game files instead.");
+
                 await _fs.File.WriteAllBytesAsync(Path.Combine(managed, Vanilla), data.Array!);
 
                 await CheckAPI();
@@ -321,27 +329,23 @@ namespace Lumafly.Services
             
             ThrowIfInvalidHash("the API", data, hash);
 
+            string? apiGameVersion = ReadApiGameVersion(data);
+            Debug.Assert(apiGameVersion != null);
+            if (GameVersion.Normalize(apiGameVersion) != _config.GameVersion)
+            {
+                await _installed.RecordApiState(new NotInstalledState());
+
+                throw new ReadableError(
+                    $"The Modding API v{ver} is built for Hollow Knight {apiGameVersion}, " +
+                    $"but the installed game is {_config.GameVersion}. " +
+                    "The Modding API available in modlinks does not support this game version.");
+            }
+
             // Backup the vanilla assembly
             if (was_vanilla)
                 _fs.File.Copy(Path.Combine(managed, Current), Path.Combine(managed, Vanilla), true);
 
             ExtractZip(data, managed);
-
-            if (was_vanilla)
-            {
-                // Check version
-                _checkValidityOfAssembly.GetAPIVersion(Current, out var currentGameVersion);
-                _checkValidityOfAssembly.GetAPIVersion(Vanilla, out var vanillaGameVersion);
-
-                if (currentGameVersion != vanillaGameVersion)
-                {
-                    // Restore
-                    _fs.File.Copy(Path.Combine(managed, Vanilla), Path.Combine(managed, Current), true);
-                    await _installed.RecordApiState(new InstalledState(false, new(), false));
-
-                    throw new InvalidOperationException($"Mismatched Game Version while installing api. MAPI(v{currentGameVersion}) Vanilla(v{vanillaGameVersion})");
-                }
-            }
 
             await _installed.RecordApiState(new InstalledState(true, new Version(ver, 0, 0), true));
         }
@@ -686,6 +690,22 @@ namespace Lumafly.Services
                 filename = uri[(uri.LastIndexOf("/", StringComparison.Ordinal) + 1)..];
 
             return (bytes, filename);
+        }
+        private string? ReadApiGameVersion(ArraySegment<byte> apiZip)
+        {
+            using var archive = new ZipArchive(apiZip.AsMemory().AsStream());
+
+            ZipArchiveEntry? entry = archive.GetEntry(Current);
+            if (entry is null)
+                return null;
+
+            // Cecil needs a seekable stream, which zip entry streams are not
+            using var assembly = new MemoryStream();
+            using (Stream entryStream = entry.Open())
+                entryStream.CopyTo(assembly);
+            assembly.Position = 0;
+            _checkValidityOfAssembly.GetAPIVersion(assembly, out var gameVersion);
+            return gameVersion;
         }
 
         private void ExtractZip(ArraySegment<byte> data, string root, string? fileNamePrefix = null)
