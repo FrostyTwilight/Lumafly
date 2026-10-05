@@ -139,6 +139,10 @@ namespace Lumafly.ViewModels
 
             HttpClient hc = new HttpClient();
             LumaflyMode lumaflyMode;
+
+            var checkValidityOfAssembly = new CheckValidityOfAssembly(fs, settings);
+            string? gameVersion = checkValidityOfAssembly.GetGameVersion(Installer.Current);
+            Trace.WriteLine($"Detected game version: {gameVersion ?? "unknown"}");
             
             var modLinksCache = Path.Combine(Settings.ConfigFolderPath, "Modlinks.xml");
             var apiLinksCache = Path.Combine(Settings.ConfigFolderPath, "ApiLinks.xml");
@@ -155,7 +159,7 @@ namespace Lumafly.ViewModels
                             settings.RequiresWorkaroundClient
                                 ? HttpSetting.OnlyWorkaround
                                 : HttpSetting.TryBoth,
-                            f => ModDatabase.FetchContent(f, settings, fetchOfficial: false),
+                            f => ModDatabase.FetchContent(f, settings, gameVersion, fetchOfficial: false),
                             AddSettings);
                     }
                     catch (InvalidModlinksException)
@@ -174,7 +178,7 @@ namespace Lumafly.ViewModels
                     settings.RequiresWorkaroundClient
                         ? HttpSetting.OnlyWorkaround
                         : HttpSetting.TryBoth,
-                    f => ModDatabase.FetchContent(f, settings, fetchOfficial: true),
+                    f => ModDatabase.FetchContent(f, settings, gameVersion, fetchOfficial: true),
                     AddSettings);
 
 
@@ -247,7 +251,7 @@ namespace Lumafly.ViewModels
               .AddSingleton<IAppUpdater>(_ => appUpdater)
               
               .AddSingleton<IGlobalSettingsFinder, GlobalSettingsFinder>()
-              .AddSingleton<ICheckValidityOfAssembly, CheckValidityOfAssembly>()
+              .AddSingleton<ICheckValidityOfAssembly>(_ => checkValidityOfAssembly)
               .AddSingleton<IOnlineTextStorage, PastebinTextStorage>()
               .AddSingleton<IFileSystem>(_ => fs)
               .AddSingleton<IModSource>(_ => installedMods)
