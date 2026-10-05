@@ -116,6 +116,7 @@ namespace Lumafly.Tests
                     "A collection of various quality of life improvements.",
                     "https://github.com/fifty-six/HollowKnight.QoL",
                     "https://github.com/fifty-six/HollowKnight.QoL",
+                    string.Empty,
                     Array.Empty<string>(),
                     Array.Empty<string>(),
                     Array.Empty<string>()

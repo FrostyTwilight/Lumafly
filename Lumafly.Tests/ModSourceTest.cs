@@ -36,6 +36,7 @@ namespace Lumafly.Tests
                 "test",
                 "repo",
                 "repo",
+                string.Empty,
                 Array.Empty<string>(),
                 Array.Empty<string>(),
                 Array.Empty<string>()
